@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAccount } from 'wagmi'
+import { GoldrushAPI } from '../goldrush'
 
 export type TokenInfo = {
   address: string
@@ -96,7 +97,6 @@ export function useTokenList() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [balancesLoaded, setBalancesLoaded] = useState(false)
-  // Add a state for cross-chain token data
   const [crossChainTokens, setCrossChainTokens] = useState<{
     allTokens: TokenInfo[],
     highestValueTokens: TokenInfo[],
@@ -107,163 +107,78 @@ export function useTokenList() {
     totalValueByChain: {}
   })
 
-  const fetchTokenBalances = useCallback(async () => {
-    if (!chainId || !address) {
+  const fetchPortfolio = useCallback(async () => {
+    if (!address) {
       setTokens([])
       setBalancesLoaded(false)
       return
     }
-
+    setLoading(true)
+    setError(null)
     try {
-      // Get token list for the current chain
-      const tokenList = TOKEN_LISTS[chainId as keyof typeof TOKEN_LISTS] || []
-      
-      // In a real implementation, fetch balances one at a time to be more reliable
-      // For demo purposes, simulate randomized balances
-      const tokensWithBalances = await Promise.all(
-        tokenList.map(async token => {
-          // Add a small randomized delay for each token to simulate network request
-          await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 500))
-          
-          // Ensure at least one token has a balance for demo purposes
-          const hasBalance = token.symbol === 'USDC' || Math.random() > 0.5
-          const randomBalance = hasBalance ? (Math.random() * 100).toFixed(4) : '0'
-          const amount = hasBalance ? Math.random() * 1000 : 0
-          
-          return {
-            ...token,
-            balance: randomBalance,
-            amount_usd: amount,
-            balanceLoaded: true
-          }
-        })
-      )
-      
-      console.log('All token balances loaded successfully')
-      setTokens(tokensWithBalances)
+      const portfolio = await GoldrushAPI.getPortfolio(address)
+      const filteredTokens = chainId
+        ? portfolio.tokens.filter(token => token.chain_id === chainId)
+        : portfolio.tokens
+      setTokens(filteredTokens.map(token => ({
+        address: token.token_address,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: token.decimals,
+        balance: token.balance,
+        price: token.price_usd,
+        amount_usd: token.value_usd,
+        chain_id: token.chain_id,
+        balanceLoaded: true
+      })))
       setBalancesLoaded(true)
-    } catch (err) {
-      console.error('Error fetching token balances:', err)
-      // Don't set error state - just keep tokens as they are
-    }
-  }, [chainId, address])
-
-  // Add a function to identify highest value tokens across all chains
-  const calculateCrossChainOpportunities = useCallback(() => {
-    // Start with an empty array for all tokens across chains
-    let allCrossChainTokens: TokenInfo[] = [];
-    
-    // Include all supported chains token lists
-    Object.keys(TOKEN_LISTS).forEach(chainIdStr => {
-      const chainId = Number(chainIdStr);
-      
-      // Skip unsupported chains
-      if (!Object.keys(SUPPORTED_NETWORKS).includes(chainIdStr)) {
-        return;
-      }
-      
-      // Get tokens for this chain and add them to our array
-      const chainTokens = TOKEN_LISTS[chainId as keyof typeof TOKEN_LISTS] || [];
-      
-      // Only add tokens with balance
-      chainTokens.forEach(token => {
-        // For demo we'll randomize balances, in a real app this would be real balances
-        const hasBalance = Math.random() > 0.3; // 70% chance of having a balance
-        const randomBalance = hasBalance ? (Math.random() * 100).toFixed(4) : '0';
-        const usdValue = hasBalance ? parseFloat(randomBalance) * (token.price || 0) : 0;
-        
-        allCrossChainTokens.push({
-          ...token,
-          balance: randomBalance,
-          amount_usd: usdValue,
+      // Cross-chain summary
+      const valueByChain = portfolio.tokens.reduce((acc, token) => {
+        if (!acc[token.chain_id]) acc[token.chain_id] = 0
+        acc[token.chain_id] += token.value_usd || 0
+        return acc
+      }, {} as Record<number, number>)
+      const topTokens = [...portfolio.tokens]
+        .filter(token => token.value_usd > 0)
+        .sort((a, b) => b.value_usd - a.value_usd)
+        .slice(0, 10)
+      setCrossChainTokens({
+        allTokens: portfolio.tokens.map(token => ({
+          address: token.token_address,
+          symbol: token.symbol,
+          name: token.name,
+          decimals: token.decimals,
+          balance: token.balance,
+          price: token.price_usd,
+          amount_usd: token.value_usd,
+          chain_id: token.chain_id,
           balanceLoaded: true
-        });
-      });
-    });
-    
-    // Calculate total value by chain
-    const valueByChain = allCrossChainTokens.reduce((acc: Record<number, number>, token) => {
-      const chainId = token.chain_id || 1;
-      if (!acc[chainId]) acc[chainId] = 0;
-      
-      const tokenValue = token.amount_usd || (parseFloat(token.balance || '0') * (token.price || 0));
-      acc[chainId] += tokenValue;
-      return acc;
-    }, {});
-    
-    // Get top 10 tokens by value across all chains
-    const topTokens = [...allCrossChainTokens]
-      .filter(token => {
-        const tokenValue = token.amount_usd || (parseFloat(token.balance || '0') * (token.price || 0));
-        return tokenValue > 0;
+        })),
+        highestValueTokens: topTokens.map(token => ({
+          address: token.token_address,
+          symbol: token.symbol,
+          name: token.name,
+          decimals: token.decimals,
+          balance: token.balance,
+          price: token.price_usd,
+          amount_usd: token.value_usd,
+          chain_id: token.chain_id,
+          balanceLoaded: true
+        })),
+        totalValueByChain: valueByChain
       })
-      .sort((a, b) => {
-        const aValue = a.amount_usd || (parseFloat(a.balance || '0') * (a.price || 0));
-        const bValue = b.amount_usd || (parseFloat(b.balance || '0') * (b.price || 0));
-        return bValue - aValue; // Highest value first
-      })
-      .slice(0, 10);
-    
-    setCrossChainTokens({
-      allTokens: allCrossChainTokens,
-      highestValueTokens: topTokens,
-      totalValueByChain: valueByChain
-    });
-    
-  }, []);
+    } catch (err) {
+      setError('Failed to fetch portfolio data')
+      setTokens([])
+      setBalancesLoaded(false)
+    } finally {
+      setLoading(false)
+    }
+  }, [address, chainId])
 
   useEffect(() => {
-    async function loadTokens() {
-      if (!chainId || !address) {
-        setTokens([])
-        setBalancesLoaded(false)
-        return
-      }
-
-      setLoading(true)
-      setError(null)
-      setBalancesLoaded(false)
-
-      // Validate if chain is supported - add explicit check for Arbitrum
-      const isChainSupported = Object.keys(SUPPORTED_NETWORKS)
-        .map(Number)
-        .includes(chainId);
-      
-      if (!isChainSupported) {
-        console.error(`Chain ID ${chainId} is not supported. Supported chains: ${Object.keys(SUPPORTED_NETWORKS).join(', ')}`);
-        setError(`Network not supported. Please switch to one of our supported networks.`);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // First load token list without balances to show something quickly
-        const tokenList = TOKEN_LISTS[chainId as keyof typeof TOKEN_LISTS] || []
-        
-        // Initialize tokens with empty balances first
-        const initialTokens = tokenList.map(token => ({
-          ...token,
-          balance: '0',
-          balanceLoaded: false
-        }))
-        
-        setTokens(initialTokens)
-        
-        // Then fetch balances in the background
-        await fetchTokenBalances()
-        
-        // After loading tokens, also calculate cross-chain opportunities
-        calculateCrossChainOpportunities();
-      } catch (err) {
-        console.error('Error loading token list:', err)
-        setError('Failed to load token list')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadTokens()
-  }, [chainId, address, fetchTokenBalances, calculateCrossChainOpportunities])
+    fetchPortfolio()
+  }, [fetchPortfolio])
 
   const isNetworkSupported = chainId != null && 
     Object.keys(SUPPORTED_NETWORKS).map(Number).includes(chainId)

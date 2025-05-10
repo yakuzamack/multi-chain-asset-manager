@@ -178,12 +178,12 @@ export function NetworkSelector() {
           <button
             onClick={() => handleSwitchNetwork(suggestedNetwork)}
             disabled={isLoading && pendingChainId === suggestedNetwork}
-            className={`text-sm py-1 px-3 rounded-full ${NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS].className} hover:opacity-80 transition-opacity disabled:opacity-50`}
+            className={`text-sm py-1 px-3 rounded-full ${NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS]?.className || ''} hover:opacity-80 transition-opacity disabled:opacity-50`}
           >
             {isLoading && pendingChainId === suggestedNetwork ? 'Switching...' : (
               <>
-                {NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS].icon} 
-                Switch to {NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS].name}
+                {NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS]?.icon || ''} 
+                Switch to {NETWORK_DETAILS[suggestedNetwork as keyof typeof NETWORK_DETAILS]?.name || suggestedNetwork}
               </>
             )}
           </button>
