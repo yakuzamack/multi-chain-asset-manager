@@ -39,7 +39,7 @@ const chains = [mainnet, bsc, gnosis, sepolia] as const
 const config = createConfig({
   chains,
   transports: {
-    [mainnet.id]: http('https://ethereum.publicnode.com'),
+    [mainnet.id]: http(`https://mainnet.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_API_KEY}`),
     [sepolia.id]: http('https://sepolia.publicnode.com'),
     [bsc.id]: http('https://bsc-dataseed.binance.org'),
     [gnosis.id]: http('https://rpc.gnosischain.com')

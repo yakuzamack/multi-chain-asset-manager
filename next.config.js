@@ -29,7 +29,14 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https://*.infura.io wss://*.walletconnect.org https://*.walletconnect.com https://*.coinbase.com https://*.etherscan.io https://*.polygonscan.com https://*.arbiscan.io https://*.optimistic.etherscan.io https://*.bscscan.com https://*.snowtrace.io https://*.gnosisscan.io; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
+            value: `
+              default-src 'self';
+              script-src 'self' 'unsafe-eval' 'unsafe-inline';
+              connect-src 'self' https://*.infura.io https://ethereum.publicnode.com https://api.web3modal.com wss://*.walletconnect.org https://*.walletconnect.com https://*.coinbase.com https://*.etherscan.io https://*.polygonscan.com https://*.arbiscan.io https://*.optimistic.etherscan.io https://*.bscscan.com https://*.snowtrace.io https://*.gnosisscan.io;
+              img-src 'self' data:;
+              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+              font-src 'self' https://fonts.gstatic.com;
+            `.replace(/\n/g, ''), // Remove newlines for CSP
           },
         ],
       },
