@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: multi-chain-asset-manager
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+    autoDeploy: true
+    branch: main
+    healthCheckPath: /
+    envFile: .env.production
+    runtime: node
+    nodeVersion: 18
+    ports:
+      - 3000 
